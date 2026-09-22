@@ -11,6 +11,7 @@ import os
 import secrets
 import stat
 import struct
+from typing import Literal
 
 from kitty.fast_data_types import SHM_NAME_MAX, shm_open, shm_unlink
 
@@ -32,12 +33,13 @@ def make_filename(prefix: str) -> str:
 
 
 class SharedMemory:
-    '''
+    """
     Create or access randomly named shared memory. To create call with empty name and specific size.
     To access call with name only.
 
     WARNING: The actual size of the shared memory may be larger than the requested size.
-    '''
+    """
+
     _fd: int = -1
     _name: str = ''
     _mmap: mmap.mmap | None = None
@@ -46,10 +48,14 @@ class SharedMemory:
     num_bytes_for_size = struct.calcsize(size_fmt)
 
     def __init__(
-        self, name: str = '', size: int = 0, readonly: bool = False,
+        self,
+        name: str = '',
+        size: int = 0,
+        readonly: bool = False,
         mode: int = stat.S_IREAD | stat.S_IWRITE,
         prefix: str = 'kitty-',
-        unlink_on_exit: bool = False, ignore_close_failure: bool = False
+        unlink_on_exit: bool = False,
+        ignore_close_failure: bool = False,
     ):
         self.unlink_on_exit = unlink_on_exit
         self.ignore_close_failure = ignore_close_failure
@@ -105,7 +111,7 @@ class SharedMemory:
     def tell(self) -> int:
         return self.mmap.tell()
 
-    def seek(self, pos: int, whence: int = os.SEEK_SET) -> None:
+    def seek(self, pos: int, whence: Literal[0, 1, 2] = os.SEEK_SET) -> None:
         self.mmap.seek(pos, whence)
 
     def flush(self) -> None:

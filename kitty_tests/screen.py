@@ -11,7 +11,6 @@ from . import BaseTest, draw_multicell, parse_bytes
 
 
 class TestScreen(BaseTest):
-
     def test_draw_fast(self):
         s = self.create_screen()
 
@@ -112,21 +111,20 @@ class TestScreen(BaseTest):
         ln = s.line(0)
         self.ae(txt, ln.as_ansi())
 
-
     def test_rep(self):
         s = self.create_screen()
         s.draw('a')
         parse_bytes(s, b'\x1b[b')
         self.ae(str(s.line(0)), 'aa')
         parse_bytes(s, b'\x1b[3b')
-        self.ae(str(s.line(0)), 'a'*5)
+        self.ae(str(s.line(0)), 'a' * 5)
         s.draw(' ')
         parse_bytes(s, b'\x1b[3b')
-        self.ae(str(s.line(1)), ' '*4)
+        self.ae(str(s.line(1)), ' ' * 4)
 
     def test_emoji_skin_tone_modifiers(self):
         s = self.create_screen()
-        q = chr(0x1f469) + chr(0x1f3fd)
+        q = chr(0x1F469) + chr(0x1F3FD)
         s.draw(q)
         self.ae(str(s.line(0)), q)
         self.ae(s.cursor.x, 2)
@@ -301,8 +299,10 @@ class TestScreen(BaseTest):
 
     def test_resize(self):
         from kitty.window import as_text
+
         def at():
             return as_text(s, add_history=True)
+
         def ac():
             return s.line(s.cursor.y)[s.cursor.x]
 
@@ -366,19 +366,19 @@ class TestScreen(BaseTest):
         s = self.create_screen(cols=5, lines=5, scrollback=15)
         s.draw('12345'), s.carriage_return(), s.index()
         s.resize(s.lines, s.columns - 1)
-        self.ae(('1234', '5', ''), tuple(str(s.line(i)) for i in range(s.cursor.y+1)))
+        self.ae(('1234', '5', ''), tuple(str(s.line(i)) for i in range(s.cursor.y + 1)))
 
         s = self.create_screen(scrollback=6)
         s.draw(''.join([str(i) * s.columns for i in range(s.lines)]))
         s.resize(3, 10)
-        self.ae(str(s.line(0)), '0'*5 + '1'*5)
-        self.ae(str(s.line(1)), '2'*5 + '3'*5)
-        self.ae(str(s.line(2)), '4'*5)
+        self.ae(str(s.line(0)), '0' * 5 + '1' * 5)
+        self.ae(str(s.line(1)), '2' * 5 + '3' * 5)
+        self.ae(str(s.line(2)), '4' * 5)
         s.resize(5, 1)
         self.ae(str(s.line(0)), '4')
         self.ae(str(s.historybuf), '3\n3\n3\n3\n3\n2')
         s = self.create_screen(scrollback=20)
-        s.draw(''.join(str(i) * s.columns for i in range(s.lines*2)))
+        s.draw(''.join(str(i) * s.columns for i in range(s.lines * 2)))
         self.ae(str(s.linebuf), '55555\n66666\n77777\n88888\n99999')
         before = at()
         s.resize(5, 2)
@@ -417,7 +417,6 @@ class TestScreen(BaseTest):
         self.ae(s.callbacks.da1, ['?62;c'])  # ]]
 
     def test_cursor_after_resize(self):
-
         def draw(text, end_line=True):
             s.draw(text)
             if end_line:
@@ -426,7 +425,7 @@ class TestScreen(BaseTest):
         s = self.create_screen()
         draw('123'), draw('123')
         y_before = s.cursor.y
-        s.resize(s.lines, s.columns-1)
+        s.resize(s.lines, s.columns - 1)
         self.ae(y_before, s.cursor.y)
 
         s = self.create_screen(cols=5, lines=8)
@@ -529,14 +528,15 @@ class TestScreen(BaseTest):
             s.tab()
             s.draw('*')
         s.cursor_position(2, 2)
-        self.ae(str(s.line(0)), '\t*'*13)
+        self.ae(str(s.line(0)), '\t*' * 13)
         s = self.create_screen(cols=4, lines=2)
         s.draw('aaaX\tbbbb')
         self.ae(str(s.line(0)) + str(s.line(1)), 'aaaXbbbb')
 
     def test_backspace(self):
         s = self.create_screen()
-        q = 'a'*s.columns
+        q = 'a' * s.columns
+
         def backspace(use_bs=True):
             if use_bs:  # this is how the kernel implements backspace
                 s.draw('\x08 \x08')
@@ -544,6 +544,7 @@ class TestScreen(BaseTest):
                 s.cursor_move(1)
                 s.draw(' ')
                 s.cursor_move(1)
+
         for use_bs in (True, False):
             s.reset()
             s.draw(q)
@@ -557,7 +558,7 @@ class TestScreen(BaseTest):
             self.ae(str(s.line(1)), ' ')
         # Test that CUB does not move cursor onto previous line
         s.reset()
-        s.draw('a'*s.columns + 'b')
+        s.draw('a' * s.columns + 'b')
         self.ae((s.cursor.x, s.cursor.y), (1, 1))
         parse_bytes(s, b'\x1b[100D')
         self.ae((s.cursor.x, s.cursor.y), (0, 1))
@@ -740,32 +741,39 @@ class TestScreen(BaseTest):
     def test_variation_selectors(self):
         s = self.create_screen(cols=3)
         q = '*\ufe0f'
-        s.draw(q*(s.columns+1))
-        self.ae(str(s.line(0)), q*(s.columns//2))
+        s.draw(q * (s.columns + 1))
+        self.ae(str(s.line(0)), q * (s.columns // 2))
         s = self.create_screen(cols=8)
+
         def widths(text, *widths):
             s.reset()
             s.draw(text)
+
             def w(x):
                 c = s.cpu_cells(0, x)
                 return (c['mcd'] or {'width': 1})['width']
+
             actual = tuple(w(x) for x in range(len(widths)))
             self.ae(widths, actual)
+
         widths('\u4e00\u4e00\u26ab\ufe0e', 2, 2, 2, 2, 1)
 
         s = self.create_screen()
+
         def tt(text_to_draw):
             s.reset()
             s.draw(text_to_draw)
             self.ae(str(s.line(0)), text_to_draw)
+
         tt('abc\U0001f44d\ufe0ed')
 
         def t(*a):
             s.reset()
             for i in range(0, len(a), 2):
-                char, x = a[i], a[i+1]
+                char, x = a[i], a[i + 1]
                 s.draw(char)
                 self.ae(s.cursor.x, x, f'after char: {char!r}')
+
         # already wide + VS15
         t('\U0001f610', 2, '\ufe0e', 1, '\ufe0e', 1)
         t('\U0001f610\ufe0e', 1, '\ufe0e', 1)
@@ -784,10 +792,11 @@ class TestScreen(BaseTest):
         t('\U0001f610', 2, '\ufe0e', 1, '\ufe0f', 1)
         # large numbers of combining chars
         s.reset()
-        s.draw("\N{HEAVY EXCLAMATION MARK SYMBOL}" + 4500 * "\N{VARIATION SELECTOR-16}")
+        s.draw('\N{HEAVY EXCLAMATION MARK SYMBOL}' + 4500 * '\N{VARIATION SELECTOR-16}')
 
     def test_writing_with_cursor_on_trailer_of_wide_character(self):
         s = self.create_screen()
+
         def r(x, pos, expected):
             s.reset()
             s.draw('😸')
@@ -802,9 +811,9 @@ class TestScreen(BaseTest):
         r('\u0304', 1, '😸\u0304')
         r('\r', 0, '😸')
 
-
     def test_serialize(self):
         from kitty.window import as_text
+
         s = self.create_screen()
         parse_bytes(s, b'\x1b[1;91m')
         s.draw('X')
@@ -845,6 +854,7 @@ class TestScreen(BaseTest):
 
     def test_wrapping_serialization(self):
         from kitty.window import as_text
+
         s = self.create_screen(cols=2, lines=2, scrollback=2, options={'scrollback_pager_history_size': 128})
         s.draw('ū̀abbccddeefū̀')
         self.ae(as_text(s, add_history=True), 'ū̀abbccddeefū̀')
@@ -924,7 +934,6 @@ class TestScreen(BaseTest):
         self.ae(contents(), 'abcde')
 
     def test_user_marking(self):
-
         def cells(*a, y=0, mark=3):
             return [(x, y, mark) for x in a]
 
@@ -1040,7 +1049,7 @@ class TestScreen(BaseTest):
         s = self.create_screen()
         set_link('u' * 2048, 'i' * 300)
         s.draw('a')
-        self.ae({('i'*256 + ':' + 'u' * (2045 - 256), 1)}, s.hyperlinks_as_set())
+        self.ae({('i' * 256 + ':' + 'u' * (2045 - 256), 1)}, s.hyperlinks_as_set())
 
         s = self.create_screen()
         set_link('1'), s.draw('1')
@@ -1192,6 +1201,7 @@ class TestScreen(BaseTest):
         def ac(idx, count):
             self.ae(c.wtcbuf, f'\033[{idx};{count}#Q'.encode('ascii'))
             c.clear()
+
         # ]]]]]]]]]]]]]]]]}}}}}}}}}}}}}}}}))))))))))))))))))))))
 
         w('#R')
@@ -1234,6 +1244,7 @@ class TestScreen(BaseTest):
                 s.draw(f'{i}{x}'), s.index(), s.carriage_return()
 
         from kitty.window import as_text
+
         def at():
             return as_text(s, add_history=True)
 
@@ -1478,7 +1489,7 @@ class TestScreen(BaseTest):
         draw_prompt('b'), mark_output()
         self.ae(lco(), '')
         self.ae(lco(which=3), '0a\n1a')
-        s.draw('running'), s.index(),  s.carriage_return()
+        s.draw('running'), s.index(), s.carriage_return()
         self.ae(lco(which=3), 'running\n')
         s = self.create_screen()
         draw_prompt('p1')
@@ -1521,6 +1532,7 @@ class TestScreen(BaseTest):
 
     def test_pointer_shapes(self):
         from kitty.window import set_pointer_shape
+
         s = self.create_screen()
         c = s.callbacks
         response = ''
@@ -1528,6 +1540,7 @@ class TestScreen(BaseTest):
         def cb(data):
             nonlocal response
             response = set_pointer_shape(s, str(data, 'utf-8'))
+
         c.set_pointer_shape = cb
 
         def send(a):
@@ -1567,17 +1580,21 @@ class TestScreen(BaseTest):
         for i in range(8):
             col = getattr(defaults, f'color{i}')
             self.ae(c.as_color(i << 8 | 1), col)
-        self.ae(c.as_color(255 << 8 | 1), Color(0xee, 0xee, 0xee))
+        self.ae(c.as_color(255 << 8 | 1), Color(0xEE, 0xEE, 0xEE))
         s = self.create_screen()
         s.color_profile.reload_from_opts(defaults)
+
         def q(send, expected=None):
             s.callbacks.clear()
             parse_bytes(s, b'\x1b]21;' + ';'.join(f'{k}={v}' for k, v in send.items()).encode() + b'\a')
             self.ae(s.callbacks.color_control_responses, [expected] if expected else [])
-        q({k: '?' for k in 'background foreground 213 unknown'.split()}, {
-            'background': defaults.background, 'foreground': defaults.foreground, '213': defaults.color213, 'unknown': '?'})
-        q({'background':'aquamarine'})
-        q({'background':'?', 'selection_background': '?'}, {'background': color_names['aquamarine'], 'selection_background': s.color_profile.highlight_bg})
+
+        q(
+            {k: '?' for k in 'background foreground 213 unknown'.split()},
+            {'background': defaults.background, 'foreground': defaults.foreground, '213': defaults.color213, 'unknown': '?'},
+        )
+        q({'background': 'aquamarine'})
+        q({'background': '?', 'selection_background': '?'}, {'background': color_names['aquamarine'], 'selection_background': s.color_profile.highlight_bg})
         q({'selection_background': ''})
         self.assertIsNone(s.color_profile.highlight_bg)
         q({'selection_background': '?'}, {'selection_background': ''})
@@ -1609,15 +1626,14 @@ def detect_url(self, scale=1):
             draw_multicell(s, text, scale=scale)
         ae(expected or url, x=x + 1 + len(before), y=y)
 
-
     t('http://moo.com')
     t('http://moo.com/something?else=+&what-')
     t('http://moo.com#fragme')
-    for (st, e) in '() {} [] <>'.split():
+    for st, e in '() {} [] <>'.split():
         t('http://moo.com', before=st, after=e)
     for trailer in ')-=':
         t('http://moo.com' + trailer)
-    for trailer in '{}([<>':   # )]>
+    for trailer in '{}([<>':  # )]>
         t('http://moo.com', after=trailer)
     if scale == 1:
         t('http://moo.com', x=s.columns - 9)

@@ -27,17 +27,20 @@ def files_in(path):
 
 
 class SSHKitten(BaseTest):
-
     @retry_on_failure()
     def test_basic_pty_operations(self):
         pty = self.create_pty('echo hello')
         pty.process_input_from_child()
         self.ae(pty.screen_contents(), 'hello')
-        pty = self.create_pty(self.cmd_to_run_python_code('''\
+        pty = self.create_pty(
+            self.cmd_to_run_python_code("""\
 import array, fcntl, sys, termios
 buf = array.array('H', [0, 0, 0, 0])
 fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ, buf)
-print(' '.join(map(str, buf)))'''), lines=13, cols=77)
+print(' '.join(map(str, buf)))"""),
+            lines=13,
+            cols=77,
+        )
         pty.process_input_from_child()
         self.ae(pty.screen_contents(), '13 77 770 260')
 
@@ -84,16 +87,21 @@ print(' '.join(map(str, buf)))'''), lines=13, cols=77)
                 os.symlink('simple-file', f'{local_home}/s1')
                 os.symlink('simple-file', f'{local_home}/s2')
 
-                conf = '''\
+                conf = """\
 copy simple-file
 copy s1
 copy --symlink-strategy=keep-path s2
 copy --dest=a/sfa simple-file
 copy --glob g.*
 copy --exclude **/w.* --exclude **/r d1
-'''
+"""
                 self.check_bootstrap(
-                    sh, remote_home, test_script='env; exit 0', SHELL_INTEGRATION_VALUE='', conf=conf, home=local_home,
+                    sh,
+                    remote_home,
+                    test_script='env; exit 0',
+                    SHELL_INTEGRATION_VALUE='',
+                    conf=conf,
+                    home=local_home,
                 )
                 tname = '.terminfo'
                 if os.path.exists('/usr/share/misc/terminfo.cdb'):
@@ -115,11 +123,23 @@ copy --exclude **/w.* --exclude **/r d1
                 # isn't in contents
                 contents.discard(f'{tname}/x/xterm-kitty')
                 contents.discard(f'{tname}/78/xterm-kitty')
-                self.ae(contents, {
-                    'g.1', 'g.2', f'{tname}/kitty.terminfo', 'simple-file', 'd1/d2/x', 'd1/y', 'a/sfa', 's1', 's2',
-                    '.local/share/kitty-ssh-kitten/kitty/version', '.local/share/kitty-ssh-kitten/kitty/bin/kitty',
-                    '.local/share/kitty-ssh-kitten/kitty/bin/kitten'
-                })
+                self.ae(
+                    contents,
+                    {
+                        'g.1',
+                        'g.2',
+                        f'{tname}/kitty.terminfo',
+                        'simple-file',
+                        'd1/d2/x',
+                        'd1/y',
+                        'a/sfa',
+                        's1',
+                        's2',
+                        '.local/share/kitty-ssh-kitten/kitty/version',
+                        '.local/share/kitty-ssh-kitten/kitty/bin/kitty',
+                        '.local/share/kitty-ssh-kitten/kitty/bin/kitten',
+                    },
+                )
                 self.ae(len(glob.glob(f'{remote_home}/{tname}/*/xterm-kitty')), 2)
 
     @retry_on_failure()
@@ -128,15 +148,13 @@ copy --exclude **/w.* --exclude **/r d1
         for sh in self.all_possible_sh:
             with tempfile.TemporaryDirectory() as tdir:
                 os.mkdir(os.path.join(tdir, 'cwd'))
-                conf = f'''
+                conf = f"""
 cwd $HOME/cwd
 env A=AAA
 env TSET={tset}
 env COLORTERM
-'''
-                pty = self.check_bootstrap(
-                    sh, tdir, test_script='env; pwd; exit 0', SHELL_INTEGRATION_VALUE='', conf=conf
-                )
+"""
+                pty = self.check_bootstrap(sh, tdir, test_script='env; pwd; exit 0', SHELL_INTEGRATION_VALUE='', conf=conf)
                 pty.wait_till(lambda: 'TSET={}'.format(tset.replace('$A', 'AAA')) in pty.screen_contents())
                 self.assertNotIn('COLORTERM', pty.screen_contents())
                 pty.wait_till(lambda: '/cwd' in pty.screen_contents())
@@ -161,9 +179,7 @@ env COLORTERM
             if 'python' in sh:
                 script = 'print("ld:" + leading_data.decode("ascii")); raise SystemExit(0);'
             with tempfile.TemporaryDirectory() as tdir:
-                pty = self.check_bootstrap(
-                    sh, tdir, test_script=script,
-                    SHELL_INTEGRATION_VALUE='', pre_data='before_tarfile')
+                pty = self.check_bootstrap(sh, tdir, test_script=script, SHELL_INTEGRATION_VALUE='', pre_data='before_tarfile')
                 self.ae(pty.screen_contents(), 'UNTAR_DONE\nld:before_tarfile')
 
     @retry_on_failure()
@@ -180,6 +196,7 @@ env COLORTERM
                 methods.append('using_passwd')
         self.assertTrue(methods)
         import pwd
+
         try:
             expected_login_shell = pwd.getpwuid(os.geteuid()).pw_shell
         except KeyError:
@@ -256,6 +273,7 @@ env COLORTERM
             def check_untar_or_fail():
                 q = pty.screen_contents()
                 return 'UNTAR_DONE' in q
+
             pty.wait_till(check_untar_or_fail, timeout=60)
             self.assertTrue(os.path.exists(os.path.join(home_dir, '.terminfo/kitty.terminfo')))
             if SHELL_INTEGRATION_VALUE != 'enabled':
