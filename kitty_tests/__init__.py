@@ -38,13 +38,12 @@ def parse_bytes(screen, data, dump_callback=None):
 
 def draw_multicell(
     screen: Screen, text: str, width: int = 0, scale: int = 1, subscale_n: int = 0, subscale_d: int = 0, vertical_align: int = 0, horizontal_align: int = 0
-    ) -> None:
+) -> None:
     cmd = f'\x1b]{TEXT_SIZE_CODE};w={width}:s={scale}:n={subscale_n}:d={subscale_d}:v={vertical_align}:h={horizontal_align};{text}\a'
     parse_bytes(screen, cmd.encode())
 
 
 class Callbacks:
-
     def __init__(self, pty=None) -> None:
         self.clear()
         self.pty = pty
@@ -62,8 +61,10 @@ class Callbacks:
 
     def color_control(self, code, data) -> None:
         from kitty.window import color_control
+
         response = color_control(self.color_profile, code, data)
         if response:
+
             def p(x):
                 if '@' in x:
                     return (to_color(x.partition('@')[0]), int(255 * float(x.partition('@')[2])))
@@ -71,7 +72,8 @@ class Callbacks:
                 if ans is None:
                     ans = x
                 return ans
-            parts = {x.partition('=')[0]:p(x.partition('=')[2]) for x in response.split(';')[1:]}
+
+            parts = {x.partition('=')[0]: p(x.partition('=')[2]) for x in response.split(';')[1:]}
             self.color_control_responses.append(parts)
 
     def title_changed(self, data, is_base64=False) -> None:
@@ -104,6 +106,7 @@ class Callbacks:
 
     def request_capabilities(self, q) -> None:
         from kitty.terminfo import get_capabilities
+
         for c in get_capabilities(q, None):
             self.write(c.encode('ascii'))
 
@@ -138,7 +141,10 @@ class Callbacks:
         self.bell_count += 1
 
     def on_da1(self) -> None:
-        self.da1.append(da1(get_options()))
+        response = da1(get_options())
+        self.da1.append(response)
+        if self.pty is not None and getattr(self.pty, 'needs_da1', False):
+            self.pty.write_to_child('[' + response, flush=False)
 
     def on_activity_since_last_focus(self) -> None:
         pass
@@ -168,6 +174,7 @@ class Callbacks:
             if self.current_clone_data:
                 cdata, self.current_clone_data = self.current_clone_data, ''
                 from kitty.launch import CloneCmd
+
                 self.clone_cmds.append(CloneCmd(cdata))
             self.current_clone_data = ''
             return
@@ -178,12 +185,14 @@ class Callbacks:
 
     def handle_remote_ssh(self, msg):
         from kittens.ssh.utils import get_ssh_data
+
         if self.pty:
-            for line in get_ssh_data(msg, "testing"):
+            for line in get_ssh_data(msg, 'testing'):
                 self.pty.write_to_child(line)
 
     def handle_remote_echo(self, msg):
         from base64 import standard_b64decode
+
         if self.pty:
             data = standard_b64decode(msg)
             self.pty.write_to_child(data)
@@ -232,17 +241,18 @@ def retry_on_failure(max_attempts=max_attempts, sleep_duration=sleep_duration):
                 try:
                     return func(*args, **kwargs)
                 except Exception:
-                    if attempt < max_attempts - 1: # Don't sleep on the last attempt
+                    if attempt < max_attempts - 1:  # Don't sleep on the last attempt
                         time.sleep(sleep_duration)
                         print(f'{func.__name__} failed, retrying in {sleep_duration} seconds', file=sys.stderr)
                     else:
-                        raise # Re-raise the last exception
+                        raise  # Re-raise the last exception
+
         return wrapper
+
     return decorator
 
 
 class BaseTest(TestCase):
-
     ae = TestCase.assertEqual
     maxDiff = 2048
     is_ci = is_ci
@@ -268,6 +278,7 @@ class BaseTest(TestCase):
 
     def cmd_to_run_python_code(self, code):
         from kitty.constants import kitty_exe
+
         return [kitty_exe(), '+runpy', code]
 
     def create_screen(self, cols=5, lines=5, scrollback=5, cell_width=10, cell_height=20, options=None):
@@ -278,11 +289,22 @@ class BaseTest(TestCase):
         return s
 
     def create_pty(
-            self, argv=None, cols=80, lines=100, scrollback=100, cell_width=10, cell_height=20,
-            options=None, cwd=None, env=None, stdin_fd=None, stdout_fd=None
+        self,
+        argv=None,
+        cols=80,
+        lines=100,
+        scrollback=100,
+        cell_width=10,
+        cell_height=20,
+        options=None,
+        cwd=None,
+        env=None,
+        stdin_fd=None,
+        stdout_fd=None,
+        needs_da1=False,
     ):
         self.set_options(options)
-        return PTY(argv, lines, cols, scrollback, cell_width, cell_height, cwd, env, stdin_fd=stdin_fd, stdout_fd=stdout_fd)
+        return PTY(argv, lines, cols, scrollback, cell_width, cell_height, cwd, env, stdin_fd=stdin_fd, stdout_fd=stdout_fd, needs_da1=needs_da1)
 
     def assertEqualAttributes(self, c1, c2):
         x1, y1, c1.x, c1.y = c1.x, c1.y, 0, 0
@@ -312,17 +334,17 @@ def forwardable_stdio():
 
 
 class PTY:
-
     def __init__(
-        self, argv=None, rows=25, columns=80, scrollback=100, cell_width=10, cell_height=20,
-        cwd=None, env=None, stdin_fd=None, stdout_fd=None
+        self, argv=None, rows=25, columns=80, scrollback=100, cell_width=10, cell_height=20, cwd=None, env=None, stdin_fd=None, stdout_fd=None, needs_da1=False
     ):
         self.is_child = False
         if isinstance(argv, str):
             argv = shlex.split(argv)
         self.write_buf = b''
+        self.needs_da1 = needs_da1
         if argv is None:
             from kitty.child import openpty
+
             self.master_fd, self.slave_fd = openpty()
             self.child_pid = 0
         else:
@@ -402,6 +424,11 @@ class PTY:
             bytes_read += len(data)
             self.received_bytes += data
             parse_bytes(self.screen, data)
+        if self.write_buf:
+            rd2, wd2, _ = select.select([], [self.master_fd], [], 0)
+            if wd2:
+                n = os.write(self.master_fd, self.write_buf)
+                self.write_buf = self.write_buf[n:]
         return bytes_read
 
     def wait_till(self, q, timeout=10, timeout_msg=None):
@@ -427,9 +454,7 @@ class PTY:
                 ec = os.waitstatus_to_exitcode(status) if hasattr(os, 'waitstatus_to_exitcode') else require_exit_code
                 self.child_waited_for = True
                 if require_exit_code is not None and ec != require_exit_code:
-                    raise AssertionError(
-                        f'Child exited with exit status: {status} code: {ec} != {require_exit_code}.'
-                        f' {self.screen_contents_for_error()}')
+                    raise AssertionError(f'Child exited with exit status: {status} code: {ec} != {require_exit_code}. {self.screen_contents_for_error()}')
                 return status
             with suppress(OSError):
                 self.process_input_from_child(timeout=0.02)
@@ -446,6 +471,7 @@ class PTY:
 
     def screen_contents_for_error(self):
         from kitty.window import as_text
+
         ans = as_text(self.screen, add_history=True, as_ansi=False)
         return f'Screen contents as repr:\n{ans!r}\nScreen contents:\n{ans.rstrip()}'
 
@@ -459,4 +485,5 @@ class PTY:
 
     def last_cmd_output(self, as_ansi=False, add_wrap_markers=False):
         from kitty.window import cmd_output
+
         return cmd_output(self.screen, as_ansi=as_ansi, add_wrap_markers=add_wrap_markers)
