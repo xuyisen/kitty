@@ -5,7 +5,7 @@ from collections.abc import Callable, Iterator, Sequence
 from enum import Enum
 from functools import lru_cache
 from gettext import gettext as _
-from typing import NamedTuple, TypeVar
+from typing import Any, Generic, NamedTuple, TypeVar
 
 from .types import run_once
 
@@ -35,11 +35,11 @@ class TokenType(Enum):
     EOF = 4
 
 
-T = TypeVar('T')
+T = TypeVar('T', default=Any)
 GetMatches = Callable[[str, str, set[T]], set[T]]
 
 
-class SearchTreeNode:
+class SearchTreeNode(Generic[T]):
     type = ExpressionType.OR
 
     def __init__(self, type: ExpressionType) -> None:
@@ -55,9 +55,9 @@ class SearchTreeNode:
         return iter(())
 
 
-class OrNode(SearchTreeNode):
+class OrNode(SearchTreeNode[T]):
 
-    def __init__(self, lhs: SearchTreeNode, rhs: SearchTreeNode) -> None:
+    def __init__(self, lhs: SearchTreeNode[T], rhs: SearchTreeNode[T]) -> None:
         self.lhs = lhs
         self.rhs = rhs
 
@@ -70,10 +70,10 @@ class OrNode(SearchTreeNode):
         yield from self.rhs.iter_token_nodes()
 
 
-class AndNode(SearchTreeNode):
+class AndNode(SearchTreeNode[T]):
     type = ExpressionType.AND
 
-    def __init__(self, lhs: SearchTreeNode, rhs: SearchTreeNode) -> None:
+    def __init__(self, lhs: SearchTreeNode[T], rhs: SearchTreeNode[T]) -> None:
         self.lhs = lhs
         self.rhs = rhs
 
@@ -86,10 +86,10 @@ class AndNode(SearchTreeNode):
         yield from self.rhs.iter_token_nodes()
 
 
-class NotNode(SearchTreeNode):
+class NotNode(SearchTreeNode[T]):
     type = ExpressionType.NOT
 
-    def __init__(self, rhs: SearchTreeNode) -> None:
+    def __init__(self, rhs: SearchTreeNode[T]) -> None:
         self.rhs = rhs
 
     def __call__(self, candidates: set[T], get_matches: GetMatches[T]) -> set[T]:
@@ -99,7 +99,7 @@ class NotNode(SearchTreeNode):
         yield from self.rhs.iter_token_nodes()
 
 
-class TokenNode(SearchTreeNode):
+class TokenNode(SearchTreeNode[T]):
     type = ExpressionType.TOKEN
 
     def __init__(self, location: str, query: str) -> None:
